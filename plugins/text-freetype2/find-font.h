@@ -3,4 +3,6 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-extern char *find_font_file(FT_Library lib, const char *face);
+extern void load_os_font_list(void);
+extern void free_os_font_list(void);
+extern const char *get_font_path(const char *family, const char *style);

@@ -24,6 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "obs-convenience.h"
 #include "find-font.h"
 
+FT_Library ft2_lib;
+
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("text-freetype2", "en-US")
 
@@ -46,6 +48,15 @@ static struct obs_source_info freetype2_source_info = {
 
 bool obs_module_load()
 {
+	FT_Init_FreeType(&ft2_lib);
+
+	if (ft2_lib == NULL) {
+		blog(LOG_WARNING, "FT2-text: Failed to initialize FT2.");
+		return false;
+	}
+
+	load_os_font_list();
+
 	obs_register_source(&freetype2_source_info);
 
 	return true;
@@ -53,6 +64,8 @@ bool obs_module_load()
 
 void obs_module_unload(void)
 {
+	free_os_font_list();
+	FT_Done_FreeType(ft2_lib);
 }
 
 static const char *ft2_source_get_name(void)
@@ -134,10 +147,6 @@ static void ft2_source_destroy(void *data)
 	if (srcdata->font_face != NULL) {
 		free(srcdata->font_face);
 		srcdata->font_face = NULL;
-	}
-	if (srcdata->ft2_lib != NULL) {
-		free(srcdata->ft2_lib);
-		srcdata->ft2_lib = NULL;
 	}
 	
 	for (uint32_t i = 0; i < num_cache_slots; i++) {
@@ -263,7 +272,7 @@ static void ft2_source_update(void *data, obs_data_t settings)
 
 	srcdata->log_mode = chat_log_mode;
 
-	if (srcdata->ft2_lib == NULL) return;
+	if (ft2_lib == NULL) return;
 	
 	if (!from_file) {
 		if (srcdata->text_file != NULL) {
@@ -312,7 +321,7 @@ static void ft2_source_update(void *data, obs_data_t settings)
 		srcdata->font_face = NULL;
 	}
 
-	FT_New_Face(srcdata->ft2_lib, srcdata->font_name, 0,
+	FT_New_Face(ft2_lib, srcdata->font_name, 0,
 		&srcdata->font_face);
 
 	if (srcdata->font_face == NULL) {
@@ -383,18 +392,11 @@ static void *ft2_source_create(obs_data_t settings, obs_source_t source)
 
 	srcdata->font_size = 32;
 
-	FT_Init_FreeType(&srcdata->ft2_lib);
-	if (srcdata->ft2_lib == NULL)
-		blog(LOG_WARNING, "FT2-text: Failed to initialize FT2.");
-
 	obs_data_set_default_int(settings, "font_size", 32);
 	obs_data_set_default_int(settings, "color1", 0xFFFFFFFF);
 	obs_data_set_default_int(settings, "color2", 0xFFFFFFFF);
 	obs_data_set_default_string(settings, "text",
-			"The lazy snake jumps over the happy MASKEN.");
-
-	char *test = find_font_file(srcdata->ft2_lib, "Arial");
-	bfree(test);
+		"The lazy snake jumps over the happy MASKEN.");
 
 	ft2_source_update(srcdata, settings);
 
